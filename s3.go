@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -151,5 +152,42 @@ func (s *S3Mock) GetObject(ctx context.Context, params *s3.GetObjectInput, optFn
 		LastModified:  aws.Time(fileInfo.ModTime()),
 	}
 
+	return out, nil
+}
+
+func (s *S3Mock) putContent(params *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
+	path := rootPath + s.options.Region + "/s3/" + *params.Bucket + "/" + *params.Key
+
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, fs.ModePerm)
+	if err != nil {
+		// todo- improve this
+		return nil, fmt.Errorf("some error")
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, params.Body)
+	if err != nil {
+		// todo- improve this
+		return nil, fmt.Errorf("some error")
+	}
+
+	return nil, nil
+}
+
+func (s *S3Mock) PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+	if params == nil {
+		params = &s3.PutObjectInput{}
+	}
+
+	if !s.isBucketExists(*params.Bucket) {
+		return nil, &types.NoSuchBucket{}
+	}
+
+	_, err := s.putContent(params)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &s3.PutObjectOutput{ETag: nil}
 	return out, nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -123,6 +124,46 @@ func (s *S3TestSuite) TestBucketExists() {
 
 	s.Assert().True(client.isBucketExists(bucketExists))
 	s.Assert().False(client.isBucketExists(bucketNotExists))
+}
+
+func (s *S3TestSuite) TestPutObject() {
+
+	testcases := []struct {
+		inputBucket string
+		inputKey    string
+		inputData   string
+		outputErr   error
+	}{
+		{
+			inputBucket: "bucket1",
+			inputKey:    "sample-01.txt",
+			inputData:   "some data",
+			outputErr:   nil,
+		},
+		{
+			inputBucket: "no-bucket",
+			inputKey:    "sample.txt",
+			inputData:   "some data",
+			outputErr:   &types.NoSuchBucket{},
+		},
+	}
+
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+	s.Assert().Nil(err)
+	s.Assert().Equal(region, cfg.Region)
+
+	client := NewFromConfig(cfg)
+	s.Assert().Equal(region, client.options.Region)
+
+	for _, tc := range testcases {
+		_, err := client.PutObject(context.TODO(), &s3.PutObjectInput{
+			Bucket:        aws.String(tc.inputBucket),
+			Key:           aws.String(tc.inputKey),
+			Body:          strings.NewReader(tc.inputData),
+			ContentLength: aws.Int64(int64(len([]byte(tc.inputData)))),
+		})
+		s.Assert().Equal(tc.outputErr, err)
+	}
 }
 
 func TestS3TestSuite(t *testing.T) {
